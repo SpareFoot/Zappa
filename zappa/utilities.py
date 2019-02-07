@@ -241,11 +241,11 @@ def get_event_source(event_source, lambda_arn, target_function, boto_session, dr
                 self.add_filters(function)
 
     class ExtendedS3EventSource(kappa.event_source.s3.S3EventSource):
-        # until https://github.com/garnaat/kappa/pull/120
-        def _make_notification_id(self, function_name=None):
-            import uuid
-            uid = str(uuid.uuid4()).split('-')[0]
-            return 'Kappa-%s-notification' % uid
+        # https://github.com/garnaat/kappa/pull/120
+        def _make_notification_id(self, function_name):
+            import hashlib
+            id_no = self._config.get('id', hashlib.md5(bytes(self._config)).hexdigest()[:8])
+            return 'Kappa-%s-notification-%s' % (function_name, id_no)
 
     event_source_map = {
         'dynamodb': kappa.event_source.dynamodb_stream.DynamoDBStreamEventSource,
@@ -265,7 +265,8 @@ def get_event_source(event_source, lambda_arn, target_function, boto_session, dr
     def autoreturn(self, function_name):
         return function_name
 
-    event_source_func._make_notification_id = autoreturn
+    if svc != 's3':
+        event_source_func._make_notification_id = autoreturn
 
     ctx = PseudoContext()
     ctx.session = boto_session
